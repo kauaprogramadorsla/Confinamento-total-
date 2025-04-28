@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Votação</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+    #banner {
+      background-color: #808080;
+      color: #000;
+      padding: 10px;
+      text-align: center;
+      font-size: 24px;
+    }
+    #votacao {
+      margin: 20px;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      margin: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #resultado {
+      margin-top: 20px;
+    }
+    #resultado-lista {
+      list-style-type: none;
+      padding: 0;
+    }
+    #resultado-lista li {
+      background-color: #fff;
+      padding: 10px;
+      margin-bottom: 5px;
+      border-radius: 5px;
+    }
+    #senha {
+      margin: 20px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="banner">Olá Povo</div>
+
+  <!-- Votação -->
+  <div id="votacao">
+    <h2>Votação:</h2>
+    <button onclick="votar('votoUnico', 'alvs')">Votar em Alvs (Voto Único)</button>
+    <button onclick="votar('votoUnico', 'kaua')">Votar em Kaua (Voto Único)</button>
+    <button onclick="votar('votoUnico', 'max')">Votar em Max (Voto Único)</button>
+
+    <h2>Votação da Torcida:</h2>
+    <button onclick="votar('votoTorcida', 'alvs')">Votar em Alvs (Torcida)</button>
+    <button onclick="votar('votoTorcida', 'kaua')">Votar em Kaua (Torcida)</button>
+    <button onclick="votar('votoTorcida', 'max')">Votar em Max (Torcida)</button>
+  </div>
+
+  <!-- Área de Senha -->
+  <div id="senha">
+    <h3>Digite a Senha para Ver o Resultado:</h3>
+    <input type="password" id="senhaInput" placeholder="Digite a senha">
+    <button onclick="verificarSenha()">Verificar</button>
+  </div>
+
+  <!-- Resultado da Votação -->
+  <h3>Resultado da Votação:</h3>
+  <div id="resultado">
+    <ul id="resultado-lista">
+      <!-- Lista de resultados será exibida aqui -->
+    </ul>
+  </div>
+
+  <!-- Início do script Firebase -->
+  <script type="module">
+    // Importando funções necessárias do Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getDatabase, ref, set, get, child, update, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";  // Importação do Database
+
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDhRQ-0yyIP1qZ6H3U1A8zmyT77sx2nPY0",
+      authDomain: "fazenda-8aebb.firebaseapp.com",
+      projectId: "fazenda-8aebb",
+      storageBucket: "fazenda-8aebb.firebasestorage.app",
+      messagingSenderId: "1076348857966",
+      appId: "1:1076348857966:web:6556f130a3a00c4b06007f",
+      measurementId: "G-Y58ZJC4X6Z"
+    };
+
+    // Inicializando o Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);  // Referência ao banco de dados Firebase
+  </script>
+  <!-- Fim do script Firebase -->
+
+  <!-- Script de Votação -->
+  <script type="module">
+    let senhaCorreta = "000"; // Senha que libera a visualização dos resultados
+
+    // Função para registrar o voto no Firebase
+    function votar(tipoVoto, nome) {
+      // A referência para cada tipo de voto (único ou torcida) no banco de dados
+      const votosRef = ref(database, tipoVoto + '/' + nome);  // Referência à votação do participante
+
+      // Incrementa o número de votos para o participante
+      set(votosRef, (snapshot) => {
+        return (snapshot.val() || 0) + 1;
+      }).then(() => {
+        // Após votar, atualizar a lista de resultados
+        atualizarResultado();
+      });
+    }
+
+    // Função para atualizar os resultados da votação
+    function atualizarResultado() {
+      const resultadoLista = document.getElementById('resultado-lista');
+      resultadoLista.innerHTML = '';
+
+      // Obter todos os votos
+      const votosRef = ref(database, 'votoUnico'); // Buscando votos do voto único
+      const votosTorcidaRef = ref(database, 'votoTorcida'); // Buscando votos da torcida
+
+      // Obtendo votos de ambos os tipos
+      Promise.all([get(votosRef), get(votosTorcidaRef)]).then((snapshots) => {
+        const votosUnico = snapshots[0].val() || {};
+        const votosTorcida = snapshots[1].val() || {};
+
+        // Exibindo resultados do voto único
+        for (let nome in votosUnico) {
+          let li = document.createElement('li');
+          li.textContent = `${nome} (Voto Único): ${votosUnico[nome]} votos`;
+          resultadoLista.appendChild(li);
+        }
+
+        // Exibindo resultados do voto da torcida
+        for (let nome in votosTorcida) {
+          let li = document.createElement('li');
+          li.textContent = `${nome} (Torcida): ${votosTorcida[nome]} votos`;
+          resultadoLista.appendChild(li);
+        }
+
+        // Exibindo a média dos votos
+        exibirMedia(votosUnico, votosTorcida);
+      });
+    }
+
+    // Função para calcular e exibir a média dos votos
+    function exibirMedia(votosUnico, votosTorcida) {
+      const resultadoLista = document.getElementById('resultado-lista');
+      
+      for (let nome in votosUnico) {
+        let media = 0;
+        let votoUnico = votosUnico[nome];
+        let votoTorcida = votosTorcida[nome] || 0;
+
+        // Calculando a média ponderada: 50% do voto único e 50% da torcida
+        media = (votoUnico * 0.5) + (votoTorcida * 0.5);
+
+        let li = document.createElement('li');
+        li.textContent = `${nome}: Média de votos = ${media.toFixed(2)}`;
+        resultadoLista.appendChild(li);
+      }
+    }
+
+    // Função para verificar a senha
+    function verificarSenha() {
+      const senhaInput = document.getElementById('senhaInput').value;
+      if (senhaInput === senhaCorreta) {
+        document.getElementById('senha').style.display = 'none';  // Esconde o campo de senha
+        document.getElementById('resultado').style.display = 'block';  // Exibe os resultados
+        atualizarResultado();  // Atualiza os resultados
+      } else {
+        alert("Senha incorreta! Tente novamente.");
+      }
+    }
+
+    // Chama a função ao carregar a página
+    window.onload = function() {
+      document.getElementById('resultado').style.display = 'none';  // Inicialmente, o resultado é escondido
+    };
+  </script>
+
+</body>
+</html>
